@@ -37,6 +37,25 @@ def fetch_market_price(market_id):
         print(f"Error fetching price for {market_id}: {e}")
         return None
 
+def fetch_full_market_data(market_id):
+    """Fetch full market data including bid-ask spread"""
+    try:
+        r = requests.get(f"{GAMMA_API_URL}/markets/{market_id}", timeout=10)
+        if r.status_code == 200:
+            market = r.json()
+            best_bid = market.get("bestBid")
+            best_ask = market.get("bestAsk")
+            if best_bid is not None and best_ask is not None:
+                return {
+                    'mid_price': (float(best_bid) + float(best_ask)) / 2,
+                    'best_bid': float(best_bid),
+                    'best_ask': float(best_ask)
+                }
+        return None
+    except Exception as e:
+        print(f"Error fetching market data for {market_id}: {e}")
+        return None
+
 def save_sim_state(running):
     """Save simulation running state"""
     with open(SIM_STATE_FILE, 'w') as f:
@@ -136,13 +155,32 @@ class SimulationSession:
             return 'NO', 1 - prob_yes
         return None, 0
     
-    def simulate_future_price(self, current_price, minutes_ahead, volatility=0.003):
-        """Simulate future price movement"""
-        drift = 0.0005
+    def simulate_future_price(self, current_price, minutes_ahead, volatility=None, category=None):
+        """Simulate future price movement with market-specific volatility"""
+        # Volatility based on category (higher for volatile markets)
+        if volatility is None:
+            if category in ['Crypto', 'Politics']:
+                volatility = 0.008  # Higher volatility
+            elif category in ['Sports', 'Esports']:
+                volatility = 0.004  # Medium volatility
+            elif category in ['Economy', 'Weather']:
+                volatility = 0.003
+            else:
+                volatility = 0.003  # Default
+        
+        # Drift: slight mean reversion for high probability bets
+        if current_price > 0.7:
+            drift = -0.0002  # Mean reversion for high prices
+        elif current_price < 0.3:
+            drift = 0.0002   # Mean reversion for low prices
+        else:
+            drift = 0.0001   # Neutral for mid-range
+        
         total_change = 0
         for _ in range(minutes_ahead):
             change = random.gauss(drift, volatility)
             total_change += change
+        
         return max(0.01, min(0.99, current_price + total_change))
     
     def open_bet(self, market):
@@ -491,7 +529,7 @@ def _run_simulation_loop(config):
     while _sim_running:
         try:
             if sim.open_bets:
-                resolved = sim.resolve_all_bets(use_real_price=True)
+                resolved = sim.resolve_all_bets(use_real_price=True, include_spread=True, slippage_pct=0.01)
             
             fill_open_bets()
             
