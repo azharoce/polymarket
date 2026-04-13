@@ -1,0 +1,671 @@
+#!/usr/bin/env python3
+"""
+Polymarket AutoBet Bot - Real Trading Ready
+Menggunakan semua credentials dari Layer 1, 2, dan 3
+
+Usage:
+    python -m bot.autobet                 # Simulation mode
+    python -m bot.autobet --real           # Real trading mode
+    python -m bot.autobet --loop          # Loop mode
+    python -m bot.autobet --real --loop    # Real + Loop
+"""
+
+import os
+import sys
+import time
+import json
+import argparse
+from datetime import datetime
+from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+from eth_account import Account
+from eth_account.signers.local import LocalAccount
+from web3 import Web3
+from py_clob_client.client import ClobClient
+from py_clob_client.clob_types import OrderArgs, ApiCreds
+from py_clob_client.exceptions import PolyApiException
+
+# Load env - try multiple paths
+script_dir = Path(__file__).parent.resolve()
+project_root = script_dir.parent.resolve()
+env_paths = [
+    project_root / ".env",
+    project_root / "real-bot" / ".env",
+    script_dir.parent / ".env",
+]
+
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"✅ Loaded .env from {env_path}")
+        break
+
+# ==============================================================================
+# KONFIGURASI - Dari .env
+# ==============================================================================
+
+# Layer 1 - Wallet
+POLY_PK = os.getenv("POLY_PK", os.getenv("PRIVATE_KEY", ""))
+POLY_FUNDER_ADDRESS = os.getenv("POLY_FUNDER_ADDRESS", os.getenv("FUNDER_ADDRESS", ""))
+POLY_SIGNATURE_TYPE = int(os.getenv("POLY_SIGNATURE_TYPE", "0"))
+
+# Layer 2 - API Credentials
+POLY_API_KEY = os.getenv("POLY_API_KEY", "")
+POLY_API_SECRET = os.getenv("POLY_API_SECRET", "")
+POLY_API_PASSPHRASE = os.getenv("POLY_API_PASSPHRASE", "")
+
+# Layer 3 - RPC
+RPC_URL = os.getenv("RPC_URL", "https://polygon-rpc.com")
+CLOB_HTTP_URL = os.getenv("CLOB_HTTP_URL", "https://clob.polymarket.com")
+USDC_CONTRACT = os.getenv("USDC_CONTRACT", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174")
+
+GAMMA_API_URL = "https://gamma-api.polymarket.com"
+
+CATEGORIES = {
+    "Sports": ["NHL", "NBA", "NFL", "FIFA", "World Cup", "Stanley Cup", "Finals", "win the"],
+    "Politics": ["President", "election", "Trump", "Biden", "Congress", "Senate", "Governor"],
+    "Crypto": ["Bitcoin", "Ethereum", "BTC", "ETH", "Solana"],
+    "Economy": ["GDP", "inflation", "recession", "Fed", "interest rate"],
+    "Tech": ["AI", "Apple", "Google", "Microsoft", "Tesla"],
+    "Culture": ["album", "movie", "Rihanna", "Carti", "GTA"],
+    "Weather": ["hurricane", "earthquake", "storm", "weather"],
+    "Esports": ["Dota", "League", "CSGO", "esports", "gaming"]
+}
+
+MIN_BET = 1.0
+API_HEADERS = {"Content-Type": "application/json"}
+
+
+def get_category(question, group=""):
+    q = question.lower()
+    g = group.lower()
+    for cat, keywords in CATEGORIES.items():
+        if any(kw.lower() in q or kw.lower() in g for kw in keywords):
+            return cat
+    return "Other"
+
+
+def get_odds(prob):
+    if prob >= 0.95:
+        return 1.05
+    elif prob >= 0.90:
+        return 1.15
+    elif prob >= 0.85:
+        return 1.25
+    elif prob >= 0.80:
+        return 1.35
+    elif prob >= 0.75:
+        return 1.45
+    elif prob >= 0.70:
+        return 1.60
+    else:
+        return 2.00
+
+
+def load_wallet():
+    if not POLY_PK:
+        print("❌ POLY_PK not found in .env")
+        return None
+    
+    key_without_prefix = POLY_PK.replace("0x", "")
+    
+    if len(key_without_prefix) != 64:
+        print(f"❌ POLY_PK invalid length: {len(key_without_prefix)}")
+        return None
+    
+    try:
+        account: LocalAccount = Account.from_key(key_without_prefix)
+        print(f"✅ Wallet loaded: {account.address}")
+        return account
+    except Exception as e:
+        print(f"❌ Failed to load wallet: {e}")
+        return None
+
+
+    def get_client():
+        """Create CLOB client dengan Layer 2 credentials"""
+        try:
+            if POLY_API_KEY and POLY_API_SECRET:
+                creds = ApiCreds(
+                    api_key=POLY_API_KEY,
+                    api_secret=POLY_API_SECRET,
+                    api_passphrase=POLY_API_PASSPHRASE
+                )
+                
+                key_hex = ""
+                if POLY_PK:
+                    key_hex = POLY_PK.replace("0x", "")
+                
+                client = ClobClient(
+                    host=CLOB_HTTP_URL,
+                    chain_id=137,
+                    key=key_hex,
+                    creds=creds,
+                    signature_type=POLY_SIGNATURE_TYPE
+                )
+            else:
+                client = ClobClient(host=CLOB_HTTP_URL, chain_id=137)
+            
+            print(f"✅ CLOB Client connected to {CLOB_HTTP_URL}")
+            return client
+        except Exception as e:
+            print(f"❌ Failed to create CLOB client: {e}")
+            return None
+
+
+def fetch_markets(closed="false", limit=100):
+    try:
+        url = f"{GAMMA_API_URL}/markets"
+        params = {
+            "closed": closed,
+            "limit": limit,
+            "active": "true"
+        }
+        
+        response = requests.get(url, params=params, headers=API_HEADERS, timeout=30)
+        markets = response.json()
+        
+        return markets
+    except Exception as e:
+        print(f"❌ Failed to fetch markets: {e}")
+        return []
+
+
+def get_current_price(market):
+    try:
+        outcome_prices = market.get("outcomePrices", [])
+        
+        if isinstance(outcome_prices, str):
+            outcome_prices = json.loads(outcome_prices)
+        
+        if not outcome_prices or len(outcome_prices) < 2:
+            return None
+        
+        yes_price = float(outcome_prices[0])
+        no_price = float(outcome_prices[1])
+        
+        mid_price = (yes_price + no_price) / 2
+        
+        return {
+            "bid": yes_price,
+            "ask": no_price,
+            "mid_price": mid_price,
+            "yes_price": yes_price,
+            "no_price": no_price
+        }
+    except Exception as e:
+        return None
+
+
+def get_token_id(market, outcome="YES"):
+    """Get token ID untuk outcome tertentu"""
+    clob_token_ids = market.get("clobTokenIds", [])
+    
+    if isinstance(clob_token_ids, str):
+        clob_token_ids = json.loads(clob_token_ids)
+    
+    if not clob_token_ids or len(clob_token_ids) < 2:
+        print(f"   ⚠️ No clobTokenIds for: {market.get('question', '')[:30]}")
+        return None
+    
+    outcomes = market.get("outcomes", ["Yes", "No"])
+    
+    # Make case-insensitive search
+    outcome_lower = outcome.lower()
+    
+    try:
+        for i, o in enumerate(outcomes):
+            if o.lower() == outcome_lower:
+                return clob_token_ids[i]
+    except Exception as e:
+        print(f"   ⚠️ Error getting token_id: {e}")
+    
+    # Fallback: YES = index 0, NO = index 1
+    if outcome.upper() == "YES":
+        return clob_token_ids[0] if len(clob_token_ids) > 0 else None
+    elif outcome.upper() == "NO":
+        return clob_token_ids[1] if len(clob_token_ids) > 1 else None
+    
+    return None
+
+
+def execute_real_trade(client, market_id, token_id, side, price, size):
+    try:
+        order_args = OrderArgs(
+            token_id=token_id,
+            side=side,
+            price=price,
+            size=size
+        )
+        
+        response = client.create_order(order_args)
+        
+        # Handle different response types
+        if hasattr(response, 'orderID'):
+            print(f"   ✅ Order placed: {response.orderID}")
+            return {"success": True, "result": response}
+        elif hasattr(response, 'order_id'):
+            print(f"   ✅ Order placed: {response.order_id}")
+            return {"success": True, "result": response}
+        else:
+            print(f"   ✅ Order response: {response}")
+            return {"success": True, "result": response}
+    except PolyApiException as e:
+        print(f"   ❌ PolyApi error: {e}")
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        print(f"   ❌ Trade error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def get_balance(client):
+    """Get USDC balance"""
+    try:
+        wallet = load_wallet()
+        if not wallet:
+            return 0.0, None
+        
+        w3 = Web3(Web3.HTTPProvider(RPC_URL))
+        
+        usdc_abi = [
+            {
+                "constant": True,
+                "inputs": [{"name": "_owner", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "balance", "type": "uint256"}],
+                "type": "function"
+            }
+        ]
+        
+        usdc_contract = w3.eth.contract(
+            address=Web3.to_checksum_address(USDC_CONTRACT),
+            abi=usdc_abi
+        )
+        
+        # Check balance at wallet address (which is also the funder address)
+        balance = usdc_contract.functions.balanceOf(wallet.address).call()
+        balance_usdc = balance / 1e6
+        
+        return balance_usdc, wallet.address
+    except Exception as e:
+        print(f"⚠️ Could not fetch balance: {e}")
+        return 0.0, None
+
+
+class AutoBetBot:
+    def __init__(self, initial_balance=100.0, min_prob=0.70, max_consecutive_losses=5,
+                 base_bet_pct=0.1, simulate=True, min_volume=1000):
+        self.initial_balance = initial_balance
+        self.balance = initial_balance
+        self.min_prob = min_prob
+        self.max_consecutive_losses = max_consecutive_losses
+        self.base_bet_pct = base_bet_pct
+        self.simulate = simulate
+        self.min_volume = min_volume
+        
+        self.client = None
+        self.wallet = None
+        self.trades = []
+        self.consecutive_losses = 0
+        self.consecutive_losses_today = 0
+        self.total_wins = 0
+        self.total_losses = 0
+        self.daily_trades = 0
+        self.stopped_today = False
+        self.current_day = datetime.now().day
+        
+        self.log_folder = Path("autobet_logs")
+        self.log_folder.mkdir(exist_ok=True)
+    
+    def initialize(self):
+        self.wallet = load_wallet()
+        self.client = get_client()
+        
+        if not self.simulate:
+            if not self.wallet or not self.client:
+                print("❌ Cannot run real trading without valid wallet & client")
+                return False
+            
+            balance, wallet_addr = get_balance(self.client)
+            print(f"   💰 USDC Balance: ${balance:.2f} (wallet: {wallet_addr})")
+            self.balance = balance if balance > 0 else self.initial_balance
+        
+        return True
+    
+    def calculate_bet_size(self):
+        """
+        Adaptive bet sizing based on balance vs initial balance:
+        - If balance < 2x initial: 20% exposure, max 2 bets
+        - If balance >= 2x initial: 30% exposure, max 3 bets
+        """
+        # Determine regime based on balance vs 2x initial balance
+        if self.balance < (self.initial_balance * 2):
+            # Regime 1: Balance < 2x initial → 20% exposure, max 2 bets
+            max_exposure_pct = 0.20
+            max_bets = 2
+        else:
+            # Regime 2: Balance >= 2x initial → 30% exposure, max 3 bets
+            max_exposure_pct = 0.30
+            max_bets = 3
+        
+        # Calculate total exposure allowed
+        max_exposure = self.balance * max_exposure_pct
+        
+        # Calculate bet size per trade
+        bet_size = max_exposure / max_bets
+        
+        # Ensure minimum bet size
+        bet_size = max(bet_size, MIN_BET)
+        
+        return bet_size
+    
+    def should_stop(self):
+        return self.consecutive_losses_today >= self.max_consecutive_losses
+    
+    def log_trade(self, trade):
+        now = datetime.now()
+        date_str = now.strftime('%d-%m-%Y')
+        hour_str = now.strftime('%H')
+        
+        log_path = self.log_folder / date_str / hour_str
+        log_path.mkdir(parents=True, exist_ok=True)
+        
+        minute_str = now.strftime('%M')
+        filename = f"{minute_str}.txt"
+        
+        with open(log_path / filename, "a") as f:
+            sim_id = f" #{trade.get('simulation_id', '')}" if trade.get('simulation_id') else ""
+            trade_str = f"{trade['action']} {trade['odds']}x | Bet: ${trade['bet_size']:.2f} | {trade['result']} | Profit: ${trade['profit']:.2f} | Balance: ${trade['balance']:.2f}"
+            f.write(f"[{now.strftime('%H:%M:%S')}{sim_id}] {trade_str}\n")
+    
+    def execute_trade(self, market, bet_size, action, odds, simulation_id=None):
+        if self.should_stop() or self.stopped_today:
+            return None
+        
+        if bet_size > self.balance:
+            bet_size = self.balance
+        
+        prob = market["prob"]
+        market_id = market.get("conditionId") or market.get("id")
+        
+        if self.simulate:
+            # Probabilistic simulation based on market probability
+            import random
+            won = random.random() < prob
+        else:
+            try:
+                token_id = get_token_id(market, action)
+                
+                if not token_id:
+                    print(f"   ❌ No token ID for {action}")
+                    return None
+                
+                price = market["yes_price"] if action == "YES" else market["no_price"]
+                
+                result = execute_real_trade(
+                    self.client, market_id, token_id,
+                    "BUY", # Always BUY to open position (Yes or No token)
+                    price, bet_size
+                )
+                
+                won = result.get("success", False)
+                
+                if not won:
+                    print(f"   ❌ Trade failed: {result.get('error')}")
+                    return None
+                    
+            except Exception as e:
+                print(f"   ❌ Trade error: {e}")
+                won = False
+        
+        if won:
+            profit = bet_size * (odds - 1)
+            self.balance += profit
+            self.consecutive_losses = 0
+            self.total_wins += 1
+            self.daily_trades += 1
+            result = "WIN"
+        else:
+            profit = -bet_size
+            self.balance -= bet_size
+            self.consecutive_losses += 1
+            self.consecutive_losses_today += 1
+            self.total_losses += 1
+            self.daily_trades += 1
+            result = "LOSE"
+            
+            if self.consecutive_losses_today >= self.max_consecutive_losses:
+                self.stopped_today = True
+        
+        trade = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "question": market["question"],
+            "category": market["category"],
+            "action": action,
+            "prob": f"{prob*100:.1f}%",
+            "odds": odds,
+            "bet_size": bet_size,
+            "profit": profit,
+            "balance": self.balance,
+            "result": result,
+            "url": market.get("url", ""),
+            "simulation_id": simulation_id
+        }
+        
+        self.trades.append(trade)
+        
+        trade_for_logging = trade.copy()
+        trade_for_logging["simulation_id"] = simulation_id
+        self.log_trade(trade_for_logging)
+        
+        return trade
+    
+    def new_day(self):
+        day = datetime.now().day
+        if day != self.current_day:
+            self.current_day = day
+            self.daily_trades = 0
+            self.consecutive_losses_today = 0
+            self.stopped_today = False
+
+
+def scan_and_trade(bot, min_volume=1000, simulation_id=None):
+    print(f"\n📥 Scanning markets...")
+    markets = fetch_markets(closed="false", limit=100)
+    
+    if not markets:
+        print("   ❌ No markets found")
+        return
+    
+    high_prob_opportunities = []
+    
+    for m in markets:
+        prices = get_current_price(m)
+        
+        if not prices:
+            continue
+        
+        vol = float(m.get("volume24hr", m.get("volume", 0)))
+        if vol < min_volume:
+            continue
+        
+        yes_price = prices["yes_price"]
+        no_price = prices["no_price"]
+        
+        if yes_price >= bot.min_prob:
+            action = "YES"
+            prob = yes_price
+            odds = get_odds(prob)
+        elif no_price >= bot.min_prob:
+            action = "NO"
+            prob = no_price
+            odds = get_odds(prob)
+        else:
+            continue
+        
+        cat = get_category(m.get("question", ""), m.get("groupItemTitle", ""))
+        
+        high_prob_opportunities.append({
+            "id": m.get("conditionId") or m.get("id"),
+            "question": m.get("question", "")[:50],
+            "category": cat,
+            "volume": vol,
+            "prob": prob,
+            "yes_price": yes_price,
+            "no_price": no_price,
+            "action": action,
+            "odds": odds,
+            "url": f"https://polymarket.com/market/{m.get('slug', m.get('conditionId', m.get('id')))}",
+            "clobTokenIds": m.get("clobTokenIds"),
+            "outcomes": m.get("outcomes", ["Yes", "No"])
+        })
+    
+    print(f"   Found {len(high_prob_opportunities)} high probability opportunities")
+    
+    if not high_prob_opportunities:
+        print("   ❌ No opportunities found")
+        return
+    
+    print(f"\n🎯 TOP OPPORTUNITIES:")
+    print(f"   {'#':<3} {'Question':<30} {'Prob':<6} {'Odds':<6} {'Vol':<12}")
+    print("   " + "-" * 80)
+    
+    sorted_opps = sorted(high_prob_opportunities, key=lambda x: x["volume"], reverse=True)
+    for i, opp in enumerate(sorted_opps[:10], 1):
+        question_truncated = opp["question"][:30]
+        print(f"   {i:<3} {question_truncated:<30} {opp['prob']*100:>5.1f}%   {opp['odds']:.2f}x   ${opp['volume']:>10,.0f}")
+    
+    print(f"\n🚀 EXECUTING TRADES (Mode: {'SIMULATE' if bot.simulate else 'REAL'})")
+    print(f"   Current Balance: ${bot.balance:.2f}")
+    
+    if bot.stopped_today:
+        print("   ⚠️ STOPPED - Max consecutive losses reached today")
+        return
+    
+    trades_executed = 0
+    
+    for opp in sorted_opps[:10]:
+        if bot.should_stop() or bot.stopped_today:
+            break
+        
+        bet_size = bot.calculate_bet_size()
+        
+        trade = bot.execute_trade(opp, bet_size, opp["action"], opp["odds"], simulation_id=simulation_id)
+        
+        if trade:
+            trades_executed += 1
+            result_icon = "✅" if trade["result"] == "WIN" else "❌"
+            print(f"   {result_icon} {trade['action']} {trade['odds']}x | Bet: ${trade['bet_size']:.2f} | Profit: ${trade['profit']:.2f}")
+    
+    print(f"\n   ✅ Executed {trades_executed} trades")
+    print(f"   💰 Balance: ${bot.balance:.2f}")
+
+
+def run_autobet(balance=100.0, min_prob=0.70, max_losses=5,
+                bet_pct=0.1, simulate=True, loop=False, interval=60, min_vol=1000):
+    
+    print("\n" + "=" * 80)
+    print("🤖 POLYMARKET AUTOBET BOT".center(80))
+    print("=" * 80)
+    
+    print(f"\n📊 CONFIG:")
+    print(f"   Initial Balance: ${balance}")
+    print(f"   Min Probability: {min_prob*100}%")
+    print(f"   Max Consecutive Losses: {max_losses}")
+    print(f"   Base Bet: {bet_pct*100}% of balance")
+    print(f"   Mode: {'SIMULATE' if simulate else 'REAL'}")
+    
+    bot = AutoBetBot(
+        initial_balance=balance,
+        min_prob=min_prob,
+        max_consecutive_losses=max_losses,
+        base_bet_pct=bet_pct,
+        simulate=simulate,
+        min_volume=min_vol
+    )
+    
+    if not bot.initialize():
+        return
+    
+    if loop:
+        print(f"\n🔄 Running in loop mode (Ctrl+C to stop)...")
+        print(f"   Scan interval: {interval} seconds\n")
+        
+        scan_count = 0
+        
+        while True:
+            try:
+                scan_count += 1
+                scan_and_trade(bot, min_volume=min_vol, simulation_id=scan_count)
+                
+                today_str = datetime.now().strftime("%d-%m-%Y")
+                summary_path = bot.log_folder / today_str / "summary.txt"
+                summary_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(summary_path, "a") as f:
+                    f.write(f"Run #{scan_count} at {datetime.now().strftime('%H:%M:%S')} - Balance: ${bot.balance:.2f}\n")
+                
+                bot.new_day()
+                time.sleep(interval)
+                
+            except KeyboardInterrupt:
+                print("\n👋 Stopped by user")
+                break
+            except Exception as e:
+                print(f"\n❌ Error: {e}")
+                time.sleep(10)
+    else:
+        scan_and_trade(bot, min_volume=min_vol, simulation_id=None)
+    
+    print(f"\n{'='*80}")
+    print("📈 SESSION SUMMARY".center(80))
+    print(f"{'='*80}")
+    print(f"   Total Trades: {len(bot.trades)}")
+    print(f"   Wins: {bot.total_wins}")
+    print(f"   Losses: {bot.total_losses}")
+    print(f"   Final Balance: ${bot.balance:.2f}")
+    print(f"   Profit: ${bot.balance - balance:.2f}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Polymarket AutoBet Bot")
+    parser.add_argument("--balance", type=float, default=100.0, help="Initial balance")
+    parser.add_argument("--min-prob", type=float, default=0.70, help="Min probability threshold")
+    parser.add_argument("--max-losses", type=int, default=5, help="Max consecutive losses")
+    parser.add_argument("--bet-pct", type=float, default=0.1, help="Bet as percentage of balance")
+    parser.add_argument("--simulate", action="store_true", default=True, help="Simulate mode")
+    parser.add_argument("--real", action="store_true", help="Use real trading")
+    parser.add_argument("--loop", action="store_true", help="Run in loop mode")
+    parser.add_argument("--interval", type=int, default=60, help="Loop interval in seconds")
+    parser.add_argument("--min-vol", type=float, default=1000, help="Min volume")
+    
+    args = parser.parse_args()
+    
+    simulate = not args.real
+    
+    if args.real:
+        if not POLY_API_KEY or not POLY_API_SECRET:
+            print("❌ Cannot run real trading without POLY_API_KEY & POLY_API_SECRET")
+            print("   Run: python real-bot/get_polymarket_creds.py")
+            return
+        
+        if not POLY_PK:
+            print("❌ Cannot run real trading without POLY_PK")
+            return
+    
+    run_autobet(
+        balance=args.balance,
+        min_prob=args.min_prob,
+        max_losses=args.max_losses,
+        bet_pct=args.bet_pct,
+        simulate=simulate,
+        loop=args.loop,
+        interval=args.interval,
+        min_vol=args.min_vol
+    )
+
+
+if __name__ == "__main__":
+    main()

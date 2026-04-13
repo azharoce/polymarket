@@ -1,0 +1,7 @@
+[2026-04-09 10:45:36] Period: 7 days
+[2026-04-09 10:45:36] Initial Balance: $10.0
+[2026-04-09 10:45:36] Trade Size: $200.0
+[2026-04-09 10:45:36] Max Position: 10%
+[2026-04-09 10:45:36] Max Daily Loss: 5%
+[2026-04-09 10:45:36] Max Consecutive Losses: 3
+[2026-04-09 10:45:37] Markets loaded: 100

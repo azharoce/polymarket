@@ -1,0 +1,6 @@
+[2026-04-09 10:45:37] DAY 2 | BUY | Will the Cleveland Cavaliers win the 202 | Entry: 0.0420 | Exit: 0.1049 | Size: $1.00 | Profit: $1.50
+[2026-04-09 10:45:37] DAY 3 | BUY | Will the Cleveland Cavaliers win the 202 | Entry: 0.0420 | Exit: 0.1030 | Size: $1.00 | Profit: $1.45
+[2026-04-09 10:45:37] DAY 4 | BUY | Will Norway win the 2026 FIFA World Cup? | Entry: 0.0275 | Exit: 0.1008 | Size: $1.00 | Profit: $2.66
+[2026-04-09 10:45:37] DAY 5 | BUY | Will Netherlands win the 2026 FIFA World | Entry: 0.0325 | Exit: 0.1158 | Size: $1.00 | Profit: $2.56
+[2026-04-09 10:45:37] DAY 6 | BUY | GTA VI released before June 2026? | Entry: 0.0195 | Exit: 0.1160 | Size: $1.00 | Profit: $4.95
+[2026-04-09 10:45:37] DAY 7 | BUY | Will the Utah Mammoth win the 2026 NHL S | Entry: 0.0295 | Exit: 0.1021 | Size: $1.00 | Profit: $2.46

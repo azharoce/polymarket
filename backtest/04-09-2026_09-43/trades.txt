@@ -1,0 +1,10 @@
+[2026-04-09 09:43:05] DAY 3 | BUY | Will the Buffalo Sabres win the 2026 NHL | Entry: 0.0465 | Exit: 0.1035 | Size: $5.00 | Profit: $6.13
+[2026-04-09 09:43:05] DAY 4 | BUY | Will the Buffalo Sabres win the 2026 NHL | Entry: 0.0465 | Exit: 0.1367 | Size: $5.00 | Profit: $9.70
+[2026-04-09 09:43:05] DAY 5 | BUY | Will the Cleveland Cavaliers win the 202 | Entry: 0.0405 | Exit: 0.1045 | Size: $5.00 | Profit: $7.90
+[2026-04-09 09:43:05] DAY 6 | BUY | Will the Ottawa Senators win the 2026 NH | Entry: 0.0375 | Exit: 0.1153 | Size: $5.00 | Profit: $10.38
+[2026-04-09 09:43:05] DAY 7 | BUY | Will the Pittsburgh Penguins win the 202 | Entry: 0.0360 | Exit: 0.1193 | Size: $5.00 | Profit: $11.58
+[2026-04-09 09:43:57] DAY 3 | BUY | Will the Buffalo Sabres win the 2026 NHL | Entry: 0.0465 | Exit: 0.1048 | Size: $10.00 | Profit: $12.53
+[2026-04-09 09:43:57] DAY 4 | BUY | Will the Ottawa Senators win the 2026 NH | Entry: 0.0375 | Exit: 0.1075 | Size: $10.00 | Profit: $18.66
+[2026-04-09 09:43:57] DAY 5 | BUY | Will Canada win the 2026 FIFA World Cup? | Entry: 0.0055 | Exit: 0.1012 | Size: $10.00 | Profit: $173.98
+[2026-04-09 09:43:57] DAY 6 | BUY | Will the Ottawa Senators win the 2026 NH | Entry: 0.0375 | Exit: 0.1082 | Size: $10.00 | Profit: $18.86
+[2026-04-09 09:43:57] DAY 7 | BUY | Will the Philadelphia Flyers win the 202 | Entry: 0.0115 | Exit: 0.1153 | Size: $10.00 | Profit: $90.28

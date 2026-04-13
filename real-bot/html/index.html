@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket Bot</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; font-size: 13px; }
+        
+        .container { max-width: 1400px; margin: 0 auto; padding: 15px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #30363d; }
+        .logo { font-size: 18px; font-weight: bold; }
+        .logo span { color: #58a6ff; }
+        
+        .mode-toggle { display: flex; gap: 8px; margin-bottom: 15px; }
+        .mode-btn { padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px; background: #161b22; color: #8b949e; cursor: pointer; transition: all 0.2s; }
+        .mode-btn:hover { border-color: #58a6ff; }
+        .mode-btn.active { background: #21262d; color: #f0f6fc; }
+        .mode-btn.real.active { border-color: #f85149; }
+        .mode-btn.simulation.active { border-color: #3fb950; }
+        
+        .balances { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+        .balance-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+        .balance-card .label { color: #8b949e; font-size: 11px; margin-bottom: 4px; }
+        .balance-card .value { font-size: 16px; font-weight: 600; color: #f0f6fc; }
+        .balance-card .value.green { color: #3fb950; }
+        .balance-card .value.yellow { color: #d29922; }
+        .balance-card .value.blue { color: #58a6ff; }
+        .balance-card .value.red { color: #f85149; }
+        
+        .hidden { display: none !important; }
+        
+        .bot-control { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
+        .bot-control .status { padding: 8px 16px; background: #21262d; border-radius: 6px; }
+        .bot-control .status.running { color: #3fb950; }
+        .bot-control .status.stopped { color: #8b949e; }
+        
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn:hover { opacity: 0.9; transform: scale(1.02); }
+        .btn-start { background: #238636; color: white; }
+        .btn-stop { background: #21262d; color: #f85149; border: 1px solid #f85149; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-reset { background: #f85149; color: white; }
+        
+        .sim-settings { display: flex; gap: 8px; align-items: center; background: #161b22; padding: 8px 12px; border-radius: 6px; flex-wrap: wrap; }
+        .sim-settings label { font-size: 11px; color: #8b949e; }
+        .sim-settings input { width: 70px; padding: 6px; border-radius: 4px; background: #21262d; color: #f0f6fc; border: 1px solid #30363d; }
+        .sim-settings select { padding: 6px; border-radius: 4px; background: #21262d; color: #f0f6fc; border: 1px solid #30363d; }
+        
+        .tabs { display: flex; gap: 2px; margin-bottom: 15px; background: #161b22; padding: 4px; border-radius: 8px; width: fit-content; }
+        .tab { padding: 8px 16px; border-radius: 6px; cursor: pointer; color: #8b949e; transition: all 0.2s; }
+        .tab:hover { color: #c9d1d9; }
+        .tab.active { background: #21262d; color: #f0f6fc; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 15px; }
+        .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; }
+        .stat-card .stat-label { color: #8b949e; font-size: 11px; margin-bottom: 4px; }
+        .stat-card .stat-value { font-size: 18px; font-weight: 600; color: #f0f6fc; }
+        
+        .table-container { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
+        .table-header { display: grid; gap: 10px; padding: 10px 15px; background: #21262d; font-weight: 600; font-size: 11px; color: #8b949e; text-transform: uppercase; }
+        .table-row { display: grid; gap: 10px; padding: 10px 15px; border-bottom: 1px solid #30363d; align-items: center; }
+        .table-row:last-child { border-bottom: none; }
+        .table-row:hover { background: #1f242c; }
+        
+        .market-name { color: #f0f6fc; }
+        .side { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; }
+        .side.YES { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+        .side.NO { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+        .price { color: #8b949e; }
+        .total { color: #f0f6fc; font-weight: 600; }
+        .total.green { color: #3fb950; }
+        .total.red { color: #f85149; }
+        
+        .price-tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .price-tag.yes { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+        .price-tag.no { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+        
+        .wallet-address { font-family: monospace; color: #58a6ff; }
+        
+        .loading { text-align: center; padding: 40px; color: #8b949e; }
+        
+        .chart-container { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .chart-header { font-size: 14px; font-weight: 600; color: #f0f6fc; margin-bottom: 10px; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0d1117; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎯 <span>Polymarket</span> Bot</div>
+            <div class="wallet-address" id="walletAddr">Loading...</div>
+        </div>
+        
+        <!-- Mode Toggle -->
+        <div class="mode-toggle">
+            <button class="mode-btn real active" id="modeReal" onclick="setMode('real')">💰 Real Trading</button>
+            <button class="mode-btn simulation" id="modeSimulation" onclick="setMode('simulation')">🎮 Simulation</button>
+        </div>
+        
+        <!-- Balances - Real Mode -->
+        <div class="balances" id="realBalances" style="display: grid;">
+            <div class="balance-card">
+                <div class="label">USDC Wallet</div>
+                <div class="value" id="walletUsdc">--</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">MATIC Wallet</div>
+                <div class="value" id="walletMatic">--</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">USDC Polymarket</div>
+                <div class="value green" id="polyUsdc">--</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">MATIC Polymarket</div>
+                <div class="value yellow" id="polyMatic">--</div>
+            </div>
+        </div>
+        
+        <!-- Balances - Simulation Mode -->
+        <div class="balances" id="simBalances" style="display: none;">
+            <div class="balance-card">
+                <div class="label">Initial Balance</div>
+                <div class="value" id="simInitial">$100.00</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">Current Balance</div>
+                <div class="value blue" id="simBalance">$100.00</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">Total Profit</div>
+                <div class="value green" id="simProfit">$0.00</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">Win Rate</div>
+                <div class="value" id="simWinRate">0%</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">Total Trades</div>
+                <div class="value" id="simTrades">0</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">Open Bets</div>
+                <div class="value" id="simOpen">0</div>
+            </div>
+            <div class="balance-card">
+                <div class="label">Realized P&L</div>
+                <div class="value" id="simRealized">$0.00</div>
+            </div>
+            <div class="balance-card" style="grid-column: span 3;">
+                <div class="label">Running P&L (Total)</div>
+                <div class="value" id="simRunning">$0.00</div>
+            </div>
+        </div>
+        
+        <!-- Bot Control - Real Mode -->
+        <div class="bot-control" id="realControl" style="display: flex;">
+            <button class="btn btn-start" id="startBtn" onclick="startBot()">▶ Start Bot</button>
+            <div class="status stopped" id="statusTag">⏹ Stopped</div>
+        </div>
+        
+        <!-- Auto Betting Config - Real Mode -->
+        <div class="bot-control" id="realSettings" style="display: flex;">
+            <div class="sim-settings">
+                <label>Bet ($)</label>
+                <input type="number" id="realBet" value="0.02" min="0.01" step="0.01">
+                <label>Min Prob %</label>
+                <input type="number" id="realProb" value="50" min="10" max="90">
+                <label>Max Open</label>
+                <input type="number" id="realMaxOpen" value="10" min="1">
+                <label>Max %</label>
+                <input type="number" id="realMaxPct" value="30" min="10" max="100">
+                <label>Interval</label>
+                <input type="number" id="realMinutes" value="1" min="1">
+                <label>Kategori</label>
+                <select id="realCategory">
+                    <option value="all">Semua</option>
+                    <option value="Sports">Sports</option>
+                    <option value="Politics">Politics</option>
+                    <option value="Crypto">Crypto</option>
+                    <option value="Economy">Economy</option>
+                    <option value="Tech">Tech</option>
+                </select>
+            </div>
+            <button class="btn btn-stop" id="autoStopBtn" onclick="stopAutoBet()" disabled>⏹ Stop Auto</button>
+        </div>
+        
+        <!-- Bot Control - Simulation Mode -->
+        <div class="bot-control" id="simControl" style="display: none;">
+            <div class="sim-settings">
+                <label>Saldo ($)</label>
+                <input type="number" id="cfgBalance" value="100" min="1">
+                <label>Bet ($)</label>
+                <input type="number" id="cfgBet" value="2" min="1">
+                <label>Min Prob</label>
+                <input type="number" id="cfgProb" value="70" min="50" max="95">
+                <label>Max Open</label>
+                <input type="number" id="cfgMaxOpen" value="10" min="1">
+                <label>Max %</label>
+                <input type="number" id="cfgMaxPct" value="30" min="10" max="100">
+                <label>Menit</label>
+                <input type="number" id="cfgMinutes" value="1" min="1">
+                <label>Kategori</label>
+                <select id="cfgCategory">
+                    <option value="all">Semua</option>
+                    <option value="Sports">Sports</option>
+                    <option value="Politics">Politics</option>
+                    <option value="Crypto">Crypto</option>
+                    <option value="Economy">Economy</option>
+                    <option value="Tech">Tech</option>
+                </select>
+            </div>
+            <button class="btn btn-start" id="simStartBtn" onclick="startSimulation()">▶ Start</button>
+            <button class="btn btn-stop" id="simStopBtn" onclick="stopSimulation()" disabled>⏹ Stop</button>
+            <button class="btn btn-reset" onclick="resetSimulation()">🔄 Reset</button>
+            <div class="status stopped" id="simStatusTag">⏹ Stopped</div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="tabs" id="tabsContainer">
+            <div class="tab active" data-tab="dashboard">📊 Dashboard</div>
+            <div class="tab" data-tab="markets">📈 Markets</div>
+            <div class="tab" data-tab="hot">🔥 Hot</div>
+            <div class="tab" data-tab="history">📜 History</div>
+            <div class="tab" data-tab="opentrades">💰 Open Trades</div>
+        </div>
+        
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content">
+            <div class="stats-grid" id="dashboardStats">
+                <!-- Filled by JS -->
+            </div>
+            
+            <!-- Chart Section -->
+            <div class="chart-container" id="chartContainer" style="display: none;">
+                <div class="chart-header">📈 Balance Chart</div>
+                <div id="balanceChart" style="height: 250px;"></div>
+            </div>
+        </div>
+        
+        <!-- Hot Markets Tab - High Win Rate -->
+        <div id="tab-hot" class="tab-content" style="display: none;">
+            <div style="padding: 10px; color: #8b949e; font-size: 12px;">🔥 High probability markets for betting</div>
+            <div class="table-container">
+                <div class="table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr;">
+                    <div>Market</div>
+                    <div>Category</div>
+                    <div>Yes %</div>
+                    <div>Volume</div>
+                    <div></div>
+                </div>
+                <div id="hotMarketsTable">
+                    <div class="loading">Loading high prob markets...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Markets Tab -->
+        <div id="tab-markets" class="tab-content" style="display: none;">
+            <div class="table-container">
+                <div class="table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr;">
+                    <div>Market</div>
+                    <div>Category</div>
+                    <div>Yes</div>
+                    <div>No</div>
+                    <div>Volume</div>
+                    <div></div>
+                </div>
+                <div id="marketsTable">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- History Tab -->
+        <div id="tab-history" class="tab-content" style="display: none;">
+            <div class="history-controls" style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;">
+                <button class="btn" id="syncHistoryBtn" onclick="syncRealHistory()" style="padding: 6px 12px;">🔄 Sync History</button>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="text" id="historySearch" placeholder="Search markets..." style="padding: 6px; border: 1px solid #30363d; border-radius: 4px; background: #21262d; color: #f0f6fc; min-width: 200px;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <select id="historyFilter" style="padding: 6px; border: 1px solid #30363d; border-radius: 4px; background: #21262d; color: #f0f6fc;">
+                        <option value="">All Trades</option>
+                        <option value="win">Wins Only</option>
+                        <option value="lose">Losses Only</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <select id="historySortBy" style="padding: 6px; border: 1px solid #30363d; border-radius: 4px; background: #21262d; color: #f0f6fc;">
+                        <option value="timestamp">Date (Newest)</option>
+                        <option value="timestamp-asc">Date (Oldest)</option>
+                        <option value="profit">Profit (High)</option>
+                        <option value="profit-asc">Profit (Low)</option>
+                        <option value="bet_size">Bet Size (Large)</option>
+                        <option value="bet_size-asc">Bet Size (Small)</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <button id="historyPrevPage" class="btn" style="padding: 6px 12px; background: #21262d; color: #f0f6fc; border: 1px solid #30363d; border-radius: 4px;">◀ Prev</button>
+                    <span id="historyPageInfo" style="color: #8b949e; min-width: 80px; text-align: center;">1 of 1</span>
+                    <button id="historyNextPage" class="btn" style="padding: 6px 12px; background: #21262d; color: #f0f6fc; border: 1px solid #30363d; border-radius: 4px;">Next ▶</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <div class="table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;">
+                    <div>Market</div>
+                    <div>Category</div>
+                    <div>Side</div>
+                    <div>Size</div>
+                    <div>Price</div>
+                    <div>Status</div>
+                    <div>Time</div>
+                    <div></div>
+                </div>
+                <div id="historyTable">
+                    <div class="loading">Loading...</div>
+                </div>
+                <div class="history-pagination-info" style="text-align: center; margin-top: 10px; color: #8b949e; font-size: 12px;">
+                    Showing <span id="historyShowing">0</span> to <span id="historyTo">0</span> of <span id="historyTotal">0</span> trades
+                </div>
+            </div>
+        </div>
+        
+        <!-- Open Trades Tab -->
+        <div id="tab-opentrades" class="tab-content" style="display: none;">
+            <div class="table-container">
+                <div class="table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;">
+                    <div>Market</div>
+                    <div>Category</div>
+                    <div>Side</div>
+                    <div>Size</div>
+                    <div>Price</div>
+                    <div>Time</div>
+                    <div></div>
+                </div>
+                <div id="openTradesTable">
+                    <div class="loading">No open trades</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Simulation Tab (hidden by default) -->
+        <div id="tab-simulation" class="tab-content" style="display: none;">
+            <div class="table-container">
+                <div class="table-header" style="grid-template-columns: 3fr 1fr 1fr 1fr 1fr 1fr;">
+                    <div>Question</div>
+                    <div>Action</div>
+                    <div>Bet</div>
+                    <div>Entry</div>
+                    <div>Exit</div>
+                    <div>Profit</div>
+                </div>
+                <div id="simulationTable">
+                    <div class="loading">Start simulation to see trades...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let currentMode = 'real';
+        let USD_TO_IDR = 16500; // Default exchange rate
+        
+        // Fetch exchange rate from API
+        async function fetchExchangeRate() {
+            try {
+                const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                const data = await res.json();
+                if (data.rates && data.rates.IDR) {
+                    USD_TO_IDR = data.rates.IDR;
+                }
+            } catch(e) {
+                console.error('Error fetching exchange rate:', e);
+            }
+        }
+        fetchExchangeRate();
+        
+        function setMode(mode) {
+            currentMode = mode;
+            
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+            
+            var realBalances = document.getElementById('realBalances');
+            var simBalances = document.getElementById('simBalances');
+            
+            if (mode === 'real') {
+                realBalances.style.display = 'grid';
+                simBalances.style.display = 'none';
+                document.getElementById('realControl').style.display = 'flex';
+                document.getElementById('realSettings').style.display = 'flex';
+                document.getElementById('simControl').style.display = 'none';
+                
+                document.getElementById('tab-simulation').style.display = 'none';
+            } else {
+                realBalances.style.display = 'none';
+                simBalances.style.display = 'grid';
+                document.getElementById('realControl').style.display = 'none';
+                document.getElementById('realSettings').style.display = 'none';
+                document.getElementById('simControl').style.display = 'flex';
+                
+                document.getElementById('tab-simulation').style.display = 'none';
+                document.getElementById('tab-dashboard').style.display = 'block';
+            }
+            
+            loadBalances();
+            loadDashboard();
+            
+            // Load simulation data when in simulation mode
+            if (mode === 'simulation') {
+                loadSimulationState();
+                loadSimulationTrades();
+                loadOpenTrades();
+                loadHistory();
+                loadChart();
+            }
+        }
+        
+        // Load simulation state (running/stopped)
+        async function loadSimulationState() {
+            try {
+                const res = await fetch(API_BASE + '/simulation/status');
+                const data = await res.json();
+                const running = data.running || false;
+                
+                document.getElementById('simStatusTag').textContent = running ? '▶ Running' : '⏹ Stopped';
+                document.getElementById('simStatusTag').className = running ? 'status running' : 'status stopped';
+                document.getElementById('simStartBtn').disabled = running;
+                document.getElementById('simStopBtn').disabled = !running;
+            } catch(e) {
+                console.error('Error loading sim state:', e);
+            }
+        }
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                if (this.id === 'simTab') return;
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+                this.classList.add('active');
+                document.getElementById('tab-' + this.dataset.tab).style.display = 'block';
+                
+                // When switching to history tab, reset pagination to page 1
+                if (this.dataset.tab === 'history') {
+                    document.getElementById('historyPageInfo').textContent = '1 of 1';
+                    document.getElementById('historySearch').value = '';
+                    document.getElementById('historyFilter').value = '';
+                    document.getElementById('historySortBy').value = 'timestamp';
+                }
+                
+                // When switching to hot tab, load hot markets
+                if (this.dataset.tab === 'hot') {
+                    loadHotMarkets();
+                }
+            });
+        });
+        
+        // History controls event listeners
+        document.getElementById('historySearch')?.addEventListener('input', function() {
+            // Reset to page 1 when search changes
+            document.getElementById('historyPageInfo').textContent = '1 of 1';
+            loadHistory();
+        });
+        
+        document.getElementById('historyFilter')?.addEventListener('change', function() {
+            // Reset to page 1 when filter changes
+            document.getElementById('historyPageInfo').textContent = '1 of 1';
+            loadHistory();
+        });
+        
+        document.getElementById('historySortBy')?.addEventListener('change', function() {
+            // Reset to page 1 when sort changes
+            document.getElementById('historyPageInfo').textContent = '1 of 1';
+            loadHistory();
+        });
+        
+        document.getElementById('historyPrevPage')?.addEventListener('click', function() {
+            const text = document.getElementById('historyPageInfo').textContent;
+            const match = text.match(/(\d+)\s+of\s+(\d+)/);
+            if (!match) return;
+            const currentPage = parseInt(match[1]);
+            const totalPages = parseInt(match[2]);
+            
+            if (currentPage > 1) {
+                document.getElementById('historyPageInfo').textContent = (currentPage - 1) + ' of ' + totalPages;
+                loadHistory();
+            }
+        });
+        
+        document.getElementById('historyNextPage')?.addEventListener('click', function() {
+            const text = document.getElementById('historyPageInfo').textContent;
+            const match = text.match(/(\d+)\s+of\s+(\d+)/);
+            if (!match) return;
+            const currentPage = parseInt(match[1]);
+            const totalPages = parseInt(match[2]);
+            
+            if (currentPage < totalPages) {
+                document.getElementById('historyPageInfo').textContent = (currentPage + 1) + ' of ' + totalPages;
+                loadHistory();
+            }
+        });
+        
+        // Chart.js for visualization
+        let balanceChart = null;
+        
+        async function loadBalances() {
+            try {
+                const res = await fetch(API_BASE + '/balances');
+                const data = await res.json();
+                
+                if (currentMode === 'real') {
+                    document.getElementById('walletUsdc').textContent = '$' + data.wallet.usdc.toFixed(2);
+                    document.getElementById('walletMatic').textContent = data.wallet.matic.toFixed(2);
+                    document.getElementById('polyUsdc').textContent = '$' + data.polymarket.usdc.toFixed(2);
+                    document.getElementById('polyMatic').textContent = data.polymarket.matic.toFixed(2);
+                    document.getElementById('walletAddr').textContent = (data.wallet.address || '').substring(0, 14) + '...';
+                } else {
+                    const sim = data.simulation || {};
+                    const balance = sim.balance || 100;
+                    const initial = sim.stats?.initial_balance || 100;
+                    const profit = sim.stats?.total_profit || 0;
+                    const openBets = sim.stats?.open_bets || 0;
+                    const openBetsValue = sim.stats?.open_bets_value || 0;
+                    
+                    // Calculate P&L in IDR
+                    const profitIdr = profit * USD_TO_IDR;
+                    const runningIdr = profitIdr + (openBetsValue * USD_TO_IDR);
+                    
+                    document.getElementById('simInitial').textContent = '$' + initial.toFixed(2);
+                    document.getElementById('simBalance').textContent = '$' + balance.toFixed(2);
+                    
+                    document.getElementById('simProfit').textContent = (profit >= 0 ? '+' : '') + '$' + profit.toFixed(2);
+                    document.getElementById('simProfit').className = profit >= 0 ? 'value green' : 'value red';
+                    
+                    document.getElementById('simWinRate').textContent = (sim.stats?.win_rate || 0).toFixed(1) + '%';
+                    document.getElementById('simTrades').textContent = sim.stats?.total_trades || 0;
+                    document.getElementById('simOpen').textContent = openBets;
+                    
+                    // Realized P&L USD
+                    const realized = profit;
+                    document.getElementById('simRealized').textContent = (realized >= 0 ? '+' : '') + '$' + realized.toFixed(2);
+                    document.getElementById('simRealized').className = realized >= 0 ? 'value green' : 'value red';
+                    
+                    // Running P&L (total) USD / IDR
+                    const runningUsd = profit + openBetsValue;
+                    const runningUsdIdr = runningUsd * USD_TO_IDR;
+                    const idrFormatted = runningUsdIdr.toLocaleString('id-ID');
+                    document.getElementById('simRunning').textContent = (runningUsd >= 0 ? '+' : '') + '$' + runningUsd.toFixed(2) + ' / Rp ' + idrFormatted;
+                    document.getElementById('simRunning').className = runningUsd >= 0 ? 'value green' : 'value red';
+                }
+            } catch(e) {
+                console.error('Error:', e);
+            }
+        }
+        
+        async function loadChart() {
+            if (currentMode !== 'simulation') {
+                document.getElementById('chartContainer').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const res = await fetch(API_BASE + '/simulation/chart');
+                const data = await res.json();
+                
+                if (!data || data.length === 0) {
+                    document.getElementById('chartContainer').style.display = 'none';
+                    return;
+                }
+                
+                // Aggregate data by date (take last entry per date)
+                const dateMap = new Map();
+                data.forEach(d => {
+                    const date = d.timestamp ? d.timestamp.substring(0, 10) : 'unknown';
+                    dateMap.set(date, { balance: d.balance, profit: d.total_profit });
+                });
+                
+                const labels = Array.from(dateMap.keys());
+                const balances = Array.from(dateMap.values()).map(v => v.balance);
+                const profits = Array.from(dateMap.values()).map(v => v.profit);
+                
+                document.getElementById('chartContainer').style.display = 'block';
+                
+                if (window.balanceChart && typeof window.balanceChart.destroy === 'function') {
+                    window.balanceChart.destroy();
+                }
+                
+                window.balanceChart = Highcharts.chart('balanceChart', {
+                    chart: {
+                        type: 'column',
+                        backgroundColor: '#161b22',
+                        style: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+                    },
+                    title: { text: '' },
+                    xAxis: {
+                        categories: labels,
+                        labels: { 
+                            style: { color: '#8b949e' },
+                            rotation: -45
+                        },
+                        lineColor: '#30363d',
+                        tickColor: '#30363d'
+                    },
+                    yAxis: {
+                        title: { text: '' },
+                        labels: { style: { color: '#8b949e' } },
+                        gridLineColor: '#30363d'
+                    },
+                    legend: {
+                        itemStyle: { color: '#8b949e' },
+                        itemHoverStyle: { color: '#c9d1d9' }
+                    },
+                    credits: { enabled: false },
+                    plotOptions: {
+                        column: {
+                            borderWidth: 0,
+                            borderRadius: 4
+                        }
+                    },
+                    series: [
+                        {
+                            name: 'Balance ($)',
+                            data: balances,
+                            color: '#58a6ff'
+                        },
+                        {
+                            name: 'Profit ($)',
+                            data: profits,
+                            color: '#3fb950'
+                        }
+                    ]
+                });
+            } catch(e) {
+                console.error('Error loading chart:', e);
+            }
+        }
+        
+        async function loadDashboard() {
+            const container = document.getElementById('dashboardStats');
+            
+            if (currentMode === 'real') {
+                try {
+                    const res = await fetch(API_BASE + '/positions');
+                    const data = await res.json();
+                    const positions = data.positions || [];
+                    
+                    let totalValue = 0;
+                    positions.forEach(p => {
+                        const size = parseFloat(p.size || 0);
+                        const price = parseFloat(p.price || 0);
+                        totalValue += size * price;
+                    });
+                    
+                    container.innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-label">Total Positions</div>
+                            <div class="stat-value">${positions.length}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Value</div>
+                            <div class="stat-value">$${totalValue.toFixed(2)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Wallet</div>
+                            <div class="stat-value">${(document.getElementById('walletAddr').textContent || '-')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Mode</div>
+                            <div class="stat-value" style="color: #f85149;">Real</div>
+                        </div>
+                    `;
+                } catch(e) {
+                    container.innerHTML = '<div class="loading">Error loading dashboard</div>';
+                }
+            } else {
+                const sim = await fetch(API_BASE + '/simulation/status').then(r => r.json()).catch(() => ({}));
+                const stats = sim.stats || {};
+                
+                container.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-label">Win Rate</div>
+                        <div class="stat-value">${(stats.win_rate || 0).toFixed(1)}%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Wins</div>
+                        <div class="stat-value" style="color: #3fb950;">${stats.wins || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Losses</div>
+                        <div class="stat-value" style="color: #f85149;">${stats.losses || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Mode</div>
+                        <div class="stat-value" style="color: #3fb950;">Simulation</div>
+                    </div>
+                `;
+                
+                loadChart();
+            }
+        }
+        
+        // Real mode bot control
+        async function startBot() {
+            const config = {
+                bet_size: parseFloat(document.getElementById('realBet').value) || 2,
+                min_prob: (parseFloat(document.getElementById('realProb').value) || 70) / 100,
+                max_open: parseInt(document.getElementById('realMaxOpen').value) || 10,
+                max_pct: (parseFloat(document.getElementById('realMaxPct').value) || 30) / 100,
+                minutes: parseInt(document.getElementById('realMinutes').value) || 1,
+                category: document.getElementById('realCategory').value === 'all' ? null : document.getElementById('realCategory').value
+            };
+            
+            try {
+                const res = await fetch(API_BASE + '/autobot/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                const data = await res.json();
+                
+                if (data.error) {
+                    if (data.error.includes('already running')) {
+                        document.getElementById('statusTag').textContent = '🤖 Running';
+                        document.getElementById('statusTag').className = 'status running';
+                        document.getElementById('startBtn').disabled = true;
+                        const stopBtn = document.getElementById('autoStopBtn');
+                        if (stopBtn) stopBtn.disabled = false;
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                    return;
+                }
+                
+                document.getElementById('statusTag').textContent = '🤖 Running';
+                document.getElementById('statusTag').className = 'status running';
+                document.getElementById('startBtn').disabled = true;
+                const stopBtn = document.getElementById('autoStopBtn');
+                if (stopBtn) stopBtn.disabled = false;
+                
+                loadBalances();
+                loadDashboard();
+                loadOpenTrades();
+            } catch(e) {
+                alert('Error: ' + e);
+            }
+        }
+        
+        async function stopAutoBet() {
+            try {
+                await fetch(API_BASE + '/autobot/stop', {method: 'POST'});
+                document.getElementById('statusTag').textContent = '⏹ Stopped';
+                document.getElementById('statusTag').className = 'status stopped';
+                document.getElementById('startBtn').disabled = false;
+                const stopBtn = document.getElementById('autoStopBtn');
+                if (stopBtn) stopBtn.disabled = true;
+            } catch(e) {
+                alert('Error: ' + e);
+            }
+        }
+        
+        // Simulation control
+        async function startSimulation() {
+            const config = {
+                balance: parseFloat(document.getElementById('cfgBalance').value) || 100,
+                bet_size: parseFloat(document.getElementById('cfgBet').value) || 2,
+                min_prob: (parseFloat(document.getElementById('cfgProb').value) || 70) / 100,
+                max_open: parseInt(document.getElementById('cfgMaxOpen').value) || 10,
+                max_pct: (parseFloat(document.getElementById('cfgMaxPct').value) || 30) / 100,
+                minutes: parseInt(document.getElementById('cfgMinutes').value) || 1,
+                max_bets: parseInt(document.getElementById('cfgMaxOpen').value) || 10,
+                category: document.getElementById('cfgCategory').value === 'all' ? null : document.getElementById('cfgCategory').value
+            };
+            
+            try {
+                const res = await fetch(API_BASE + '/simulation/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                
+                document.getElementById('simStatusTag').textContent = '▶ Running';
+                document.getElementById('simStatusTag').className = 'status running';
+                document.getElementById('simStartBtn').disabled = true;
+                document.getElementById('simStopBtn').disabled = false;
+                
+                loadBalances();
+                loadDashboard();
+                loadSimulationTrades();
+            } catch(e) {
+                alert('Error: ' + e);
+            }
+        }
+        
+        async function stopSimulation() {
+            try {
+                await fetch(API_BASE + '/simulation/stop', {method: 'POST'});
+                document.getElementById('simStatusTag').textContent = '⏹ Stopped';
+                document.getElementById('simStatusTag').className = 'status stopped';
+                document.getElementById('simStartBtn').disabled = false;
+                document.getElementById('simStopBtn').disabled = true;
+                loadBalances();
+                loadDashboard();
+            } catch(e) {
+                alert('Error: ' + e);
+            }
+        }
+        
+        async function resetSimulation() {
+            try {
+                await fetch(API_BASE + '/simulation/reset', {method: 'POST'});
+                loadBalances();
+                loadDashboard();
+                loadSimulationTrades();
+            } catch(e) {
+                alert('Error: ' + e);
+            }
+        }
+        
+        async function loadSimulationTrades() {
+            console.log('Loading simulation trades...');
+            try {
+                const res = await fetch(API_BASE + '/simulation/trades');
+                const data = await res.json();
+                console.log('Got data:', data.count, 'trades,', data.open_bets?.length, 'open bets');
+                
+                // Show resolved trades
+                let tradesHtml = '';
+                (data.trades || []).slice(0, 20).forEach(t => {
+                    tradesHtml += `
+                        <div class="table-row" style="grid-template-columns: 3fr 1fr 1fr 1fr 1fr 1fr;">
+                            <div class="market-name" title="${t.question || t.market || '-'}">${(t.question || t.market || '-').substring(0, 30)}</div>
+                            <div class="side ${t.action}">${t.action}</div>
+                            <div class="price">$${(t.bet_size || t.size || 0).toFixed(2)}</div>
+                            <div class="price">@${((t.entry_price || 0.5) * 100).toFixed(1)}%</div>
+                            <div class="price">@${((t.exit_price || 0.5) * 100).toFixed(1)}%</div>
+                            <div class="${(t.profit || 0) >= 0 ? 'total green' : 'total red'}">${(t.profit || 0) >= 0 ? '+' : ''}$${(t.profit || 0).toFixed(2)}</div>
+                        </div>
+                    `;
+                });
+                
+                // Also show from history endpoint
+                if (!tradesHtml) {
+                    const histRes = await fetch(API_BASE + '/simulation/history');
+                    const histData = await histRes.json();
+                    console.log('History:', histData.count);
+                    
+                    (histData.trades || []).slice(0, 20).forEach(t => {
+                        tradesHtml += `
+                            <div class="table-row" style="grid-template-columns: 3fr 1fr 1fr 1fr 1fr 1fr;">
+                                <div class="market-name">-</div>
+                                <div class="side ${t.action}">${t.action}</div>
+                                <div class="price">$${(t.bet_size || 0).toFixed(2)}</div>
+                                <div class="price">-</div>
+                                <div class="price">-</div>
+                                <div class="${(t.profit || 0) >= 0 ? 'total green' : 'total red'}">${(t.profit || 0) >= 0 ? '+' : ''}$${(t.profit || 0).toFixed(2)}</div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                document.getElementById('simulationTable').innerHTML = tradesHtml || '<div class="loading">No trades yet - Start simulation</div>';
+            } catch(e) {
+                console.error('Error loading simulation trades:', e);
+                document.getElementById('simulationTable').innerHTML = '<div class="loading">Error loading trades</div>';
+            }
+        }
+        
+        async function loadHistory() {
+            try {
+                const pageText = document.getElementById('historyPageInfo')?.textContent || '1 of 1';
+                const pageMatch = pageText.match(/(\d+)/);
+                const page = pageMatch ? parseInt(pageMatch[1]) : 1;
+                const perPage = 20; // Fixed page size for now
+                const search = document.getElementById('historySearch')?.value.toLowerCase() || '';
+                const filter = document.getElementById('historyFilter')?.value || '';
+                const sortBy = document.getElementById('historySortBy')?.value || 'timestamp';
+                
+                // Build query parameters
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    per_page: perPage.toString(),
+                    search: search,
+                    filter: filter,
+                    sort_by: sortBy
+                }).toString();
+                
+                let url, transformFunc;
+                
+                if (currentMode === 'real') {
+                    url = API_BASE + '/trades';
+                    if (params) url += '?' + params;
+                    transformFunc = (t) => ({
+                        question: t.market || '-',
+                        action: t.side || '-',
+                        size: t.size || 0,
+                        price: t.price || 0,
+                        profit: t.profit || 0,
+                        won: t.profit > 0,
+                        status: t.profit > 0 ? 'WIN' : (t.profit < 0 ? 'LOSE' : '-'),
+                        timestamp: t.timestamp || null,
+                        conditionId: t.conditionId || null,
+                        category: t.category || '-'
+                    });
+                } else {
+                    url = API_BASE + '/simulation/history';
+                    if (params) url += '?' + params;
+                    transformFunc = (t) => ({
+                        question: t.question || t.market || '-',
+                        action: t.action || '-',
+                        size: t.bet_size || t.size || 0,
+                        price: (t.odds || 1) > 1 ? (1 / t.odds * 100) : (t.entry_price || 0.5) * 100,
+                        profit: t.profit || 0,
+                        won: t.won || (t.profit > 0),
+                        status: (t.result || (t.won ? 'WIN' : 'LOSE') || '-').toUpperCase(),
+                        timestamp: t.timestamp || null,
+                        conditionId: t.conditionId || null,
+                        category: t.category || '-'
+                    });
+                }
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                // Update pagination info
+                const pagination = data.pagination || {};
+                document.getElementById('historyPageInfo').textContent = 
+                    `${pagination.page || 1} of ${pagination.pages || 1}`;
+                document.getElementById('historyShowing').textContent = 
+                    ((pagination.page || 1) - 1) * perPage + 1;
+                document.getElementById('historyTo').textContent = 
+                    Math.min(((pagination.page || 1) * perPage), pagination.total || 0);
+                document.getElementById('historyTotal').textContent = pagination.total || 0;
+                
+                // Enable/disable pagination buttons
+                document.getElementById('historyPrevPage').disabled = (pagination.page || 1) <= 1;
+                document.getElementById('historyNextPage').disabled = (pagination.page || 1) >= (pagination.pages || 1);
+                
+                const trades = data.trades || [];
+                let html = '';
+                
+                trades.forEach(t => {
+                    const transformed = transformFunc(t);
+                    const profitClass = transformed.profit >= 0 ? 'green' : 'red';
+                    const profitPrefix = transformed.profit >= 0 ? '+' : '';
+                    const statusClass = transformed.won ? 'YES' : 'NO';
+                    const tradeTime = transformed.timestamp ? new Date(transformed.timestamp).toLocaleString('id-ID', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                    const category = transformed.category || '-';
+                    const marketUrl = transformed.conditionId ? 'https://polymarket.com/event/' + transformed.conditionId : null;
+                    
+                    html += `
+                        <div class="table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;">
+                            <div class="market-name" title="${transformed.question}">${transformed.question ? transformed.question.substring(0, 30) : '-'}</div>
+                            <div class="price">${category}</div>
+                            <div class="side ${transformed.action}">${transformed.action}</div>
+                            <div class="price">$${transformed.size.toFixed(2)}</div>
+                            <div class="price">@${transformed.price.toFixed(1)}%</div>
+                            <div><span class="side ${statusClass}">${transformed.status}</span></div>
+                            <div class="price">${tradeTime}</div>
+                            <div>${marketUrl ? '<button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="window.open(\'' + marketUrl + '\', \'_blank\')">→</button>' : '-'}</div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('historyTable').innerHTML = html || '<div class="loading">No history - Start simulation first</div>';
+            } catch(e) {
+                console.error('Error:', e);
+                document.getElementById('historyTable').innerHTML = '<div class="loading">Error loading history</div>';
+            }
+        }
+        
+        async function loadOpenTrades() {
+            try {
+                if (currentMode === 'real') {
+                    const res = await fetch(API_BASE + '/positions');
+                    const data = await res.json();
+                    const positions = data.positions || [];
+                    
+                    let html = '';
+                    positions.forEach(p => {
+                        const entryTime = p.timestamp ? new Date(p.timestamp).toLocaleString('id-ID', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                        const category = p.category || '-';
+                        const marketUrl = p.conditionId ? 'https://polymarket.com/event/' + p.conditionId : null;
+                        const value = ((p.qty || 0) * (p.price || 0));
+                        html += `
+                            <div class="table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;">
+                                <div class="market-name" title="${p.title || p.market}">${(p.title || p.market || '-').substring(0, 30)}</div>
+                                <div class="price">${category}</div>
+                                <div class="side ${p.side || 'YES'}">${p.side || 'YES'}</div>
+                                <div class="price">${p.qty || p.size || 0}</div>
+                                <div class="price">@$${p.price || p.avg_price || 0}</div>
+                                <div class="price">${entryTime}</div>
+                                <div>${marketUrl ? '<button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="window.open(\'' + marketUrl + '\', \'_blank\')">→</button>' : '-'}</div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('openTradesTable').innerHTML = html || '<div class="loading">No open trades</div>';
+                } else {
+                    const res = await fetch(API_BASE + '/simulation/trades');
+                    const data = await res.json();
+                    const openBets = data.open_bets || [];
+                    
+                    let html = '';
+                    openBets.forEach(b => {
+                        const entryTime = b.timestamp ? new Date(b.timestamp).toLocaleString('id-ID', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                        const category = b.category || '-';
+                        const marketUrl = b.conditionId ? 'https://polymarket.com/event/' + b.conditionId : null;
+                        html += `
+                            <div class="table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;">
+                                <div class="market-name" title="${b.question}">${(b.question || '-').substring(0, 30)}</div>
+                                <div class="price">${category}</div>
+                                <div class="side ${b.action}">${b.action}</div>
+                                <div class="price">$${b.amount?.toFixed(2)}</div>
+                                <div class="price">@${(b.entry_prob * 100).toFixed(1)}%</div>
+                                <div class="price">${entryTime}</div>
+                                <div>${marketUrl ? '<button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="window.open(\'' + marketUrl + '\', \'_blank\')">→</button>' : '-'}</div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('openTradesTable').innerHTML = html || '<div class="loading">No open bets</div>';
+                }
+            } catch(e) {
+                console.error('Error:', e);
+            }
+        }
+        
+        async function loadMarkets() {
+            try {
+                const res = await fetch(API_BASE + '/markets');
+                const markets = await res.json();
+                
+                let html = '';
+                markets.slice(0, 30).forEach(m => {
+                    const prices = m.outcomePrices ? JSON.parse(m.outcomePrices) : [0, 0];
+                    const vol = parseFloat(m.volume24hr || 0);
+                    const endTime = m.endDate ? new Date(m.endDate).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+                    const category = m.groupItemTitle || m.category || '-';
+                    const marketUrl = 'https://polymarket.com/market/' + m.slug;
+                    html += `
+                        <div class="table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;">
+                            <div class="market-name" title="${m.question}">${m.question.substring(0, 35)}</div>
+                            <div class="price">${category}</div>
+                            <div class="price-tag yes">${(parseFloat(prices[0]) * 100).toFixed(0)}%</div>
+                            <div class="price-tag no">${(parseFloat(prices[1]) * 100).toFixed(0)}%</div>
+                            <div class="price">$${vol.toFixed(0)}</div>
+                            <div><button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="window.open('${marketUrl}', '_blank')">→</button></div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('marketsTable').innerHTML = html || '<div class="loading">No markets</div>';
+            } catch(e) {
+                console.error('Error:', e);
+            }
+        }
+        
+        async function syncRealHistory() {
+            const btn = document.getElementById('syncHistoryBtn');
+            btn.textContent = '⏳ Syncing...';
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch(API_BASE + '/trades/sync', {method: 'POST'});
+                const data = await res.json();
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    btn.textContent = '✅ Synced ' + data.count + ' trades';
+                    loadHistory();
+                }
+            } catch(e) {
+                alert('Error: ' + e);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        // Load Hot Markets - High probability
+        async function loadHotMarkets() {
+            try {
+                const res = await fetch(API_BASE + '/markets');
+                const markets = await res.json();
+                
+                // Get one entry per market - the side closest to 50% probability (best value)
+                let entries = [];
+                let seen = new Set();
+                
+                markets.forEach(m => {
+                    if (seen.has(m.conditionId)) return; // Skip duplicates
+                    
+                    if (m.outcomePrices) {
+                        try {
+                            const prices = JSON.parse(m.outcomePrices);
+                            const yesProb = parseFloat(prices[0]) * 100;
+                            const noProb = parseFloat(prices[1]) * 100;
+                            const vol = parseFloat(m.volume24hr || m.volume || 0);
+                            
+                            // Skip extreme probabilities (<10 or >90)
+                            if (yesProb < 10 || yesProb > 90) return;
+                            
+                            // Pick the side closest to 50% (best value)
+                            const yesDiff = Math.abs(50 - yesProb);
+                            const noDiff = Math.abs(50 - noProb);
+                            
+                            if (yesDiff <= noDiff) {
+                                entries.push({
+                                    ...m,
+                                    side: 'YES',
+                                    sideProb: yesProb,
+                                    otherSideProb: noProb,
+                                    vol: vol
+                                });
+                            } else {
+                                entries.push({
+                                    ...m,
+                                    side: 'NO',
+                                    sideProb: noProb,
+                                    otherSideProb: yesProb,
+                                    vol: vol
+                                });
+                            }
+                            
+                            seen.add(m.conditionId);
+                        } catch(e) {}
+                    }
+                });
+                
+                // Sort by probability closest to 50% (best value)
+                entries.sort((a, b) => Math.abs(50 - a.sideProb) - Math.abs(50 - b.sideProb));
+                
+                // Take top 15
+                const topEntries = entries.slice(0, 15);
+                
+                let html = '';
+                topEntries.forEach(m => {
+                    const category = m.groupItemTitle || m.category || '-';
+                    const marketUrl = 'https://polymarket.com/market/' + m.slug;
+                    
+                    html += `
+                        <div class="table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;">
+                            <div class="market-name" title="${m.question}">${m.question.substring(0, 40)}</div>
+                            <div class="price">${category}</div>
+                            <div class="price-tag ${m.side === 'YES' ? 'yes' : 'no'}">${m.side} ${m.sideProb.toFixed(0)}%</div>
+                            <div class="price">${m.otherSideProb.toFixed(0)}%</div>
+                            <div class="price">$${m.vol.toFixed(0)}</div>
+                            <div><button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="window.open('${marketUrl}', '_blank')">→</button></div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('hotMarketsTable').innerHTML = html || '<div class="loading">No value markets</div>';
+            } catch(e) {
+                console.error('Error:', e);
+            }
+        }
+        
+        // Initialize
+        setMode('real');
+        loadBalances();
+        loadDashboard();
+        loadMarkets();
+        loadHotMarkets();
+        
+        // Real-time update every 1 minute for stats
+        setInterval(() => {
+            loadBalances();
+            if (currentMode === 'simulation') {
+                loadSimulationState();
+                loadDashboard();
+                loadSimulationTrades();
+                loadOpenTrades();
+                loadHistory();
+            }
+        }, 60000);
+        
+        // Load hot markets every 1 minute
+        setInterval(() => {
+            loadHotMarkets();
+        }, 60000);
+    </script>
+</body>
+</html>

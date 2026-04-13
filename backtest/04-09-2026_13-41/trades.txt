@@ -1,0 +1,5 @@
+[2026-04-09 13:41:22] DAY 3 | BUY | Will the Cleveland Cavaliers win the 202 | Entry: 0.0415 | Exit: 0.1074 | Size: $100.00 | Profit: $158.81
+[2026-04-09 13:41:22] DAY 4 | BUY | Will the Minnesota Wild win the 2026 NHL | Entry: 0.0445 | Exit: 0.1165 | Size: $100.00 | Profit: $161.85
+[2026-04-09 13:41:22] DAY 5 | BUY | Will the Buffalo Sabres win the 2026 NHL | Entry: 0.0425 | Exit: 0.1429 | Size: $100.00 | Profit: $236.32
+[2026-04-09 13:41:22] DAY 6 | BUY | Will the Philadelphia Flyers win the 202 | Entry: 0.0125 | Exit: 0.1158 | Size: $100.00 | Profit: $826.07
+[2026-04-09 13:41:22] DAY 7 | BUY | Will the Minnesota Wild win the 2026 NHL | Entry: 0.0445 | Exit: 0.1248 | Size: $100.00 | Profit: $180.52

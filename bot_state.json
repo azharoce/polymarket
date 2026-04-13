@@ -1,0 +1,15 @@
+{
+  "mode": "stopped",
+  "initial_balance": 150.0,
+  "balance": 150.0,
+  "running": false,
+  "start_time": "2026-04-10T13:45:43.838285",
+  "total_trades": 0,
+  "bot_config": {
+    "min_prob": 0.7,
+    "max_losses": 5,
+    "bet_pct": 0.1,
+    "min_volume": 1000,
+    "interval": 60
+  }
+}

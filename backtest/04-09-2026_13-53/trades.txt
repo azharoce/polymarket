@@ -1,0 +1,3 @@
+[2026-04-09 13:53:03] DAY 6 | BUY | Will the Philadelphia 76ers win the 2026 | Entry: 0.0105 | Exit: 0.0100 | Size: $50.00 | Profit: $-2.38
+[2026-04-09 13:53:03] DAY 6 | BUY | MegaETH market cap (FDV) >$6B one day af | Entry: 0.0195 | Exit: 0.0100 | Size: $50.00 | Profit: $-24.36
+[2026-04-09 13:53:03] DAY 7 | BUY | Will Colombia win the 2026 FIFA World Cu | Entry: 0.0175 | Exit: 0.0100 | Size: $50.00 | Profit: $-21.43

@@ -1,0 +1,3 @@
+# Polymarket Trading Bot - Python Version
+# This bot implements automated trading on Polymarket based on external signals
+# and includes risk management, order execution, and market monitoring.

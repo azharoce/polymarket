@@ -1,0 +1,29 @@
+{
+  "name": "polymarket-trading-bot",
+  "version": "1.0.0",
+  "description": "Polymarket Trading Bot in JavaScript",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "polymarket",
+    "trading",
+    "bot",
+    "crypto"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.7.0",
+    "ws": "^8.14.2",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "jest": "^29.6.1",
+    "nodemon": "^3.0.1"
+  }
+}

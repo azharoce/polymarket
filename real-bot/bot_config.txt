@@ -1,0 +1,14 @@
+# Bot Configuration File
+mode=real
+initial_balance=100.0
+current_balance=100.0
+running=true
+
+# Strategy Parameters
+min_prob=0.7
+max_losses=5
+bet_pct=0.1
+min_volume=1000
+interval=60
+
+# Last updated: 2026-04-11T01:06:19.401620

@@ -1,0 +1,4 @@
+[2026-04-09 13:40:52] DAY 4 | BUY | Will the Ottawa Senators win the 2026 NH | Entry: 0.0390 | Exit: 0.1025 | Size: $1.00 | Profit: $1.63
+[2026-04-09 13:40:52] DAY 5 | BUY | Will the Minnesota Wild win the 2026 NHL | Entry: 0.0445 | Exit: 0.1080 | Size: $1.00 | Profit: $1.43
+[2026-04-09 13:40:52] DAY 6 | BUY | Will the Minnesota Wild win the 2026 NHL | Entry: 0.0445 | Exit: 0.1269 | Size: $1.00 | Profit: $1.85
+[2026-04-09 13:40:52] DAY 7 | BUY | Will the Los Angeles Kings win the 2026  | Entry: 0.0075 | Exit: 0.1040 | Size: $1.00 | Profit: $12.87

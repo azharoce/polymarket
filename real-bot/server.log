@@ -1,0 +1,7 @@
+✅ Loaded state: mode=stopped, balance=$50.00
+Starting server at http://localhost:5001
+Mode: Simulation (new) + Real Trading
+ * Serving Flask app 'server'
+ * Debug mode: on
+Address already in use
+Port 5001 is in use by another program. Either identify and stop that program, or start the server with a different port.

@@ -1,0 +1,10 @@
+[08:52:47] NO 1.05x | Bet: $10.00 | WIN | Profit: $0.50 | Balance: $100.50
+[08:52:47] NO 1.05x | Bet: $10.05 | WIN | Profit: $0.50 | Balance: $101.00
+[08:52:47] NO 1.35x | Bet: $10.10 | WIN | Profit: $3.54 | Balance: $104.54
+[08:52:47] NO 1.05x | Bet: $10.45 | WIN | Profit: $0.52 | Balance: $105.06
+[08:52:47] NO 1.05x | Bet: $10.51 | WIN | Profit: $0.53 | Balance: $105.59
+[08:52:47] NO 1.25x | Bet: $10.56 | WIN | Profit: $2.64 | Balance: $108.23
+[08:52:47] NO 1.35x | Bet: $10.82 | WIN | Profit: $3.79 | Balance: $112.01
+[08:52:47] NO 1.05x | Bet: $11.20 | WIN | Profit: $0.56 | Balance: $112.57
+[08:52:47] NO 1.05x | Bet: $11.26 | WIN | Profit: $0.56 | Balance: $113.14
+[08:52:47] NO 1.05x | Bet: $11.31 | WIN | Profit: $0.57 | Balance: $113.70
